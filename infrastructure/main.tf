@@ -130,3 +130,71 @@ resource "aws_s3_bucket_notification" "bronze_trigger" {
   }
   depends_on = [aws_lambda_permission.allow_s3_bronze]
 }
+
+# --- 8. DATA SOURCES FOR ACCOUNT ID AND REGION ---
+data "aws_caller_identity" "current" {}
+data "aws_region" "current" {}
+
+# --- 9. IOT POLICY (Security & Principle of Least Privilege) ---
+resource "aws_iot_policy" "smartdrive_policy" {
+  name = "SmartDriveVehiclePolicy"
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action   = ["iot:Connect"]
+        Effect   = "Allow"
+        Resource = "arn:aws:iot:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:client/$${iot:Connection.Thing.ThingName}"
+      },
+      {
+        Action   = ["iot:Publish"]
+        Effect   = "Allow"
+        Resource = "arn:aws:iot:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:topic/vehicle/$${iot:Connection.Thing.ThingName}/telemetry"
+      }
+    ]
+  })
+}
+
+resource "aws_iot_thing" "test_vehicle" {
+  name = "TESTVIN123456789"
+}
+
+# --- 10. LAMBDA EXECUTION ROLE ---
+resource "aws_iam_role" "lambda_exec_role" {
+  name = "smartdrive-lambda-exec-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Action = "sts:AssumeRole"
+      Effect = "Allow"
+      Principal = { Service = "lambda.amazonaws.com" }
+    }]
+  })
+}
+
+resource "aws_iam_role_policy" "lambda_policy" {
+  name = "smartdrive-lambda-policy"
+  role = aws_iam_role.lambda_exec_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      { # Read access from the Bronze layer
+        Action   = ["s3:GetObject"]
+        Effect   = "Allow"
+        Resource = "${aws_s3_bucket.bronze.arn}/*"
+      },
+      { # Write access to the Silver layer
+        Action   = ["s3:PutObject"]
+        Effect   = "Allow"
+        Resource = "${aws_s3_bucket.silver.arn}/*"
+      },
+      { # CloudWatch logging for observability
+        Action   = ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"]
+        Effect   = "Allow"
+        Resource = "arn:aws:logs:*:*:*"
+      }
+    ]
+  })
+}
