@@ -44,4 +44,4 @@ if [ ! -f "AmazonRootCA1.pem" ]; then
 fi
 
 echo "✨ DONE! Certificates are located in the hardware/certs/ folder."
-echo "🚀 You can now start monitor.py!"
+echo "🚀 You can now start main.py!"
