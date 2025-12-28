@@ -1,0 +1,70 @@
+# --- General ---
+.DS_Store
+.AppleDouble
+.LSOverride
+Thumbs.db
+*.log
+.env
+.idea/
+.vscode/
+*.swp
+
+# --- Python (AWS Lambda & Scripts) ---
+#
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+.pytest_cache/
+.aws/
+
+# --- Terraform ---
+#
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+*.tfvars
+*.tfvars.json
+override.tf
+override.tf.json
+.terraform.lock.hcl
+
+# --- Mobile (Flutter / React Native) ---
+#
+# Flutter
+.dart_tool/
+.packages
+.pub-cache/
+.pub/
+build/
+
+# React Native / Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.expo/
+
+# Mobile OS
+ios/Pods/
+ios/.generated/
+android/.gradle/
+android/local.properties
+android/app/debug/
+android/app/release/
+*.keystore
+*.jks
+
+# --- Databases ---
+#
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+
+# --- Documentation Artifacts ---
+docs/_site/
+.obsidian/
