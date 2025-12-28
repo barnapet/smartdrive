@@ -16,6 +16,7 @@ __pycache__/
 *$py.class
 .venv/
 venv/
+sd-env/
 ENV/
 .pytest_cache/
 .aws/
@@ -68,3 +69,12 @@ android/app/release/
 # --- Documentation Artifacts ---
 docs/_site/
 .obsidian/
+
+# Security
+hardware/certs/*.pem
+hardware/certs/*.crt
+hardware/certs/*.key
+**/certs/*.pem
+**/certs/*.crt
+**/certs/*.key
+certs/
