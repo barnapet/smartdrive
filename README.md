@@ -61,17 +61,20 @@ The project includes exhaustive documentation covering every phase of the softwa
 
 ### 1. Clone the Repository
 ```bash
-git clone [https://github.com/barnapet/smartdrive.git](https://github.com/barnapet/smartdrive.git)
+git clone https://github.com/barnapet/smartdrive.git
 cd smartdrive
 ```
 
 ### 2. Deploy Infrastructure (Terraform)
 ```bash
-cd infra/terraform
+cd infrastructure/terraform
 terraform init
 terraform apply
 ```
 
-## 👤Author
-[Peter Barna] - Lead Developer & Data Engineer
-[LinkedIn Profile]([https://www.linkedin.com/in/peter-barna-dev/])
+---
+
+## 👤 Author
+
+**Peter Barna** – Lead Developer & Data Engineer
+* [LinkedIn Profile](https://www.linkedin.com/in/peter-barna-dev/)
