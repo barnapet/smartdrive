@@ -1,11 +1,11 @@
-import time
 import json
 import logging
+import time
 from dataclasses import asdict
 from .interfaces import OBDProvider
 
 class SmartDriveMonitor:
-    def __init__(self, provider: OBDProvider, cloud_client=None):
+    def __init__(self, provider: OBDProvider, cloud_client):
         self.provider = provider
         self.cloud_client = cloud_client
         self.is_running = False
@@ -26,5 +26,15 @@ class SmartDriveMonitor:
             logging.info("🛑 Shutting down...")
 
     def _publish(self, data):
+        """Sending data to the AWS IoT Core."""
         payload = json.dumps(asdict(data))
-        logging.info(f"📡 Data published: {payload}")
+        topic = f"vehicle/{data.vin}/telemetry"
+        
+        try:
+            if self.cloud_client:
+                self.cloud_client.publish(topic, payload, 1)
+                logging.info(f"📡 Cloud: Data sent to {topic} -> {payload}")
+            else:
+                logging.warning(f"⚠️ Offline mode: {payload}")
+        except Exception as e:
+            logging.error(f"❌ Failed to publish to AWS: {e}")
