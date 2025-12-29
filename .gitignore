@@ -20,6 +20,9 @@ sd-env/
 ENV/
 .pytest_cache/
 .aws/
+*.zip
+!processor.zip
+python/
 
 # --- Terraform ---
 #

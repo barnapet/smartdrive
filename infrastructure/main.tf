@@ -135,7 +135,7 @@ resource "aws_s3_bucket_notification" "bronze_trigger" {
 data "aws_caller_identity" "current" {}
 data "aws_region" "current" {}
 
-# --- 9. IOT POLICY (Security & Principle of Least Privilege) ---
+# --- 9. IOT POLICY (Javított verzió) ---
 resource "aws_iot_policy" "smartdrive_policy" {
   name = "SmartDriveVehiclePolicy"
   policy = jsonencode({
@@ -144,12 +144,12 @@ resource "aws_iot_policy" "smartdrive_policy" {
       {
         Action   = ["iot:Connect"]
         Effect   = "Allow"
-        Resource = "arn:aws:iot:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:client/$${iot:Connection.Thing.ThingName}"
+        Resource = "arn:aws:iot:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:client/$${iot:Connection.Thing.ThingName}"
       },
       {
         Action   = ["iot:Publish"]
         Effect   = "Allow"
-        Resource = "arn:aws:iot:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:topic/vehicle/$${iot:Connection.Thing.ThingName}/telemetry"
+        Resource = "arn:aws:iot:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:topic/vehicle/$${iot:Connection.Thing.ThingName}/telemetry"
       }
     ]
   })
@@ -197,4 +197,75 @@ resource "aws_iam_role_policy" "lambda_policy" {
       }
     ]
   })
+}
+
+# --- 11. GOLD LAYER: DTC GLOBAL CACHE (DynamoDB) ---
+resource "aws_dynamodb_table" "dtc_cache" {
+  name           = "DTC_Global_Cache"
+  billing_mode   = "PAY_PER_REQUEST"
+  hash_key       = "dtc_id"
+
+  attribute {
+    name = "dtc_id"
+    type = "S"
+  }
+
+  tags = {
+    Project = "SmartDrive"
+    Layer   = "Gold"
+  }
+}
+
+# --- 12. SECRETS FOR THIRD-PARTY APIS ---
+resource "aws_secretsmanager_secret" "openai_key" {
+  name        = "smartdrive/openai-key"
+  description = "OpenAI API key for Mechanic-Translator"
+}
+
+# --- 13. MECHANIC-TRANSLATOR LAMBDA ---
+resource "aws_lambda_function" "mechanic_translator" {
+  filename      = "mechanic_translator.zip"
+  function_name = "smartdrive-mechanic-translator"
+  role          = aws_iam_role.lambda_exec_role.arn
+  handler       = "lambda_function.lambda_handler"
+  runtime       = "python3.9"
+  layers        = [aws_lambda_layer_version.openai_layer.arn]
+  source_code_hash = filebase64sha256("mechanic_translator.zip")
+  timeout      = 20    
+  memory_size  = 256
+  environment {
+    variables = {
+      DYNAMODB_TABLE = aws_dynamodb_table.dtc_cache.name
+    }
+  }
+}
+
+# --- 14. EXTENDED PERMISSIONS FOR LAMBDA ---
+resource "aws_iam_role_policy" "lambda_translator_policy" {
+  name = "smartdrive-lambda-translator-policy"
+  role = aws_iam_role.lambda_exec_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action   = ["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:UpdateItem"]
+        Effect   = "Allow"
+        Resource = aws_dynamodb_table.dtc_cache.arn
+      },
+      {
+        Action   = ["secretsmanager:GetSecretValue"]
+        Effect   = "Allow"
+        Resource = aws_secretsmanager_secret.openai_key.arn
+      }
+    ]
+  })
+}
+
+# --- 15. LAMBDA LAYER FOR OPENAI LIBRARY ---
+resource "aws_lambda_layer_version" "openai_layer" {
+  filename            = "openai_layer.zip"
+  layer_name          = "openai_library"
+  compatible_runtimes = ["python3.9"]
+  source_code_hash    = filebase64sha256("openai_layer.zip")
 }
