@@ -1,6 +1,6 @@
 # System Design: Algorithms & Logic Plan
 
-**Version:** 1.0
+**Version:** 1.1
 **Date:** December 2025
 **Project:** SmartDrive OBD-II Data Platform & Ecosystem
 **Document Status:** Detailed Logic Specification
@@ -8,19 +8,37 @@
 
 ---
 
-## 1. Mechanic-Translator (DTC Interpretation Logic)
-This algorithm is responsible for converting technical Diagnostic Trouble Codes (e.g., P0101) into actionable, human-readable instructions.
+# System Design: Algorithms & Logic Plan (v1.1)
 
-### 1.1 Logic Flow
-1. **DTC Ingestion:** The system receives the hex code via the mobile edge.
-2. **Static Lookup:** The code is cross-referenced against a database of ~10,000 standardized (SAE) and manufacturer-specific codes.
-3. **Contextual Analysis:** The system analyzes "Freeze Frame" data (e.g., if the code is "Lean Mixture" and the Mass Air Flow sensor reading is also low, the fault is isolated to the MAF sensor).
-4. **Severity Weighting:**
-    * **Critical (Red):** Immediate stop required (e.g., low oil pressure).
-    * **Warning (Yellow):** Service recommended within 500 km.
-    * **Informative (Blue):** Minor fault in a convenience feature (e.g., seat heater malfunction).
+---
 
+## 1. Mechanic‑Translator (Hybrid DTC Interpretation)
+This algorithm is responsible for translating diagnostic trouble codes (DTCs) into human‑readable explanations, combining deterministic databases with Generative AI capabilities.
 
+### 1.1 Multi‑Tier Lookup Logic
+The system searches for an explanation using the following hierarchy:
+
+1. **Tier 1: SAE Standard Library (L1 Cache):**  
+   The software includes a built‑in JSON database containing standard P0xxx codes.
+
+2. **Tier 2: DynamoDB Global Cache (L2):**  
+   If the code is non‑standard (e.g., manufacturer‑specific), the system queries the cloud‑based global cache, which stores previously translated codes.
+
+3. **Tier 3: LLM Fallback (gpt‑4o‑mini):**  
+   If no match is found, the system calls the OpenAI API with a context‑aware prompt (vehicle model + code).  
+   The returned explanation is immediately saved into Tier 2 for future requests.
+
+### 1.2 Severity & Action Logic
+Each interpretation is assigned a severity level based on the following categories:
+
+* **Critical (Red):** Immediate stop required.  
+  AI prompt keyword: *"immediate safety risk"*.
+
+* **Warning (Yellow):** Service recommended within 500 km.  
+  AI prompt keyword: *"preventive maintenance"*.
+
+* **Informative (Blue):** Non‑critical comfort or auxiliary system issue.  
+  AI prompt keyword: *"non-critical"*.
 
 ---
 
