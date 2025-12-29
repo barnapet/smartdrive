@@ -72,6 +72,39 @@ terraform init
 terraform apply
 ```
 
+### 3. Hardware Testing & Diagnostics
+
+To verify the connection between the **ELM327** adapter and the local Linux development environment, use the built‑in diagnostic tool.
+
+## Prerequisites
+
+### 1. Pair the Adapter
+Ensure your **ELM327** device is paired via your OS Bluetooth settings.
+
+### 2. Bind RFCOMM Serial Port
+Manually bind the device to a serial port (replace `<MAC_ADDRESS>` with your adapter's MAC):
+
+```bash
+sudo rfcomm connect rfcomm0 <MAC_ADDRESS> 1
+```
+
+## Run Live Diagnostic
+Open a second terminal and run the diagnostic script.
+This tool bypasses automatic discovery and forces a stable connection on /dev/rfcomm0.
+
+```bash
+# Set environment to REAL mode and run with sudo permissions
+sudo SMARTDRIVE_MODE=REAL ./sd-env/bin/python3 scripts/obd_diagnostic.py
+```
+
+## Expected Metrics
+
+| Metric  | Target Value       | Description                                         |
+|---------|--------------------|-----------------------------------------------------|
+| Voltage | 13.5V – 14.4V      | Indicates the alternator is charging the battery.  |
+| RPM     | ~800 (idle)        | Real-time engine revolutions per minute.           |
+| Speed   | 0+ km/h            | Current vehicle speed retrieved from the ECU.      |
+
 ---
 
 ## 👤 Author
