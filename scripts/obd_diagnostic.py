@@ -37,8 +37,8 @@ def run_diagnostic():
         time.sleep(5)
 
     print("\n✅ Connection stable. Starting live data stream...\n")
-    print(f"{'Time':<10} | {'Voltage':<12} | {'RPM':<10} | {'Speed':<10}")
-    print("-" * 60)
+    print(f"{'Time':<10} | {'Voltage':<12} | {'RPM':<10} | {'Temp':<8} | {'Speed':<10}")
+    print("-" * 70)
 
     try:
         # 3. Data Acquisition Loop
@@ -54,16 +54,18 @@ def run_diagnostic():
                 v_status = "🔋" if data.voltage > 13.2 else "🪫" 
                 
                 # Using carriage return (\r) to update the same line
-                output = (
-                    f"{timestamp:<10} | {v_status} {data.voltage:>6.2f}V | "
-                    f"{data.rpm:>7.0f} | {data.speed:>6.1f} km/h"
-                )
-                print(output, end='\r')
+		output = (
+		    f"{timestamp:<10} | {v_status} {data.voltage:>6.2f}V | "
+		    f"{data.rpm:>7.0f} | "
+		    f"{data.coolant_temp:>6.0f}°C | "
+		    f"{data.speed:>6.1f} km/h"
+		)
+		print(output, end='\r')
             else:
                 print("\n⚠️ Data drop detected or waiting for ECU response...", end='\r')
 
             # Sleep to prevent overwhelming the ELM327 chip
-            time.sleep(1) 
+            time.sleep(5) 
 
     except KeyboardInterrupt:
         print("\n\n🛑 Diagnostic stopped by user.")

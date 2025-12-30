@@ -7,3 +7,4 @@ class TelemetryData:
     speed: float
     rpm: float
     voltage: float
+    coolant_temp: float

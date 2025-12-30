@@ -16,12 +16,10 @@ class RealOBDProvider(OBDProvider):
         self.connection = None
 
     def connect(self) -> bool:
-        # 1. If a manual port is provided, try it first
         if self.port:
             logging.info(f"🔍 [REAL] Connecting on direct port: {self.port}...")
             return self._attempt_connection(self.port)
 
-        # 2. Otherwise, fall back to automatic discovery
         logging.info("🔍 [REAL] Starting automatic OBD-II discovery...")
         ports = obd.scan_serial()
         if not ports:
@@ -39,8 +37,6 @@ class RealOBDProvider(OBDProvider):
         try:
             logging.info(f"🔄 Connection attempt: {port_name}...")
             conn = obd.OBD(port_name, fast=False)
-            
-            # Brief delay to allow the adapter to initialize
             time.sleep(1.5)
             status = conn.status()
 
@@ -66,7 +62,6 @@ class RealOBDProvider(OBDProvider):
         
         def get_value(cmd):
             res = self.connection.query(cmd)
-            # Safe extraction: return 0.0 if value is missing or lacks magnitude
             if res.value is not None and hasattr(res.value, 'magnitude'):
                 return float(res.value.magnitude)
             return 0.0
@@ -77,4 +72,5 @@ class RealOBDProvider(OBDProvider):
             speed=get_value(obd.commands.SPEED),
             rpm=get_value(obd.commands.RPM),
             voltage=get_value(obd.commands.ELM_VOLTAGE)
+	    coolant_temp=get_value(obd.commands.COOLANT_TEMP)
         )
