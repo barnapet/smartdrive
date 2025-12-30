@@ -3,6 +3,7 @@ import os
 from AWSIoTPythonSDK.MQTTLib import AWSIoTMQTTClient
 from .providers import SimulatedOBDProvider, RealOBDProvider
 from .app import SmartDriveMonitor
+from .infrastructure import AWSCloudPublisher
 
 def create_aws_client(vin):
     client = AWSIoTMQTTClient(vin)
@@ -26,10 +27,11 @@ def main():
     VIN = "TESTVIN123456789"
     MODE = os.getenv("SMARTDRIVE_MODE", "SIMULATED")
     aws_client = create_aws_client(VIN)
+    publisher = AWSCloudPublisher(aws_client)
     if aws_client.connect():
         logging.info("✅ Connected to AWS IoT Core")
     provider = RealOBDProvider(VIN) if MODE == "REAL" else SimulatedOBDProvider(VIN)
-    monitor = SmartDriveMonitor(provider, aws_client)
+    monitor = SmartDriveMonitor(provider, publisher)
     monitor.start()
 
 if __name__ == "__main__":
