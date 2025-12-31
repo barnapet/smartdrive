@@ -1,6 +1,6 @@
-# Software Requirements Specification (SRS): SmartDrive Platform
+# Software Requirements Specification (SRS): SmartDrive Platform (v1.1)
 
-**Version:** 1.0
+**Version:** 1.1
 **Date:** Dec 2025
 **Project:** SmartDrive OBD-II Data Platform & Ecosystem
 **Author:** Peter Barna
@@ -31,20 +31,21 @@ The system consists of a cross-platform mobile application, a cloud-native IoT d
 
 ---
 
-## 3. Functional Requirements (Requirement List)
+## 3. Functional Requirements
 
 | ID | Name | Detailed Description | Priority |
 | :--- | :--- | :--- | :--- |
 | **FR1** | **OBD-II Connection** | Establish stable BT/BLE connection with ELM327 dongles. Automatic reconnection on drop. | **Critical** |
 | **FR2** | **DTC Diagnostics** | Read and clear Stored and Pending Diagnostic Trouble Codes (DTC). | **High** |
 | **FR3** | **Mechanic-Translator** | Translate DTCs into natural language; determine severity levels (Critical/Warning/Info). | **High** |
-| **FR4** | **Real-time Telemetry** | Capture speed, RPM, coolant temp, and voltage at a minimum 5s sampling rate. | **Medium** |
-| **FR5** | **Battery SOH Analysis** | Profile voltage drop during engine start to estimate Battery State of Health (SOH). | **High** |
+| **FR4** | **Adaptive Telemetry** | Capture speed, RPM, and voltage with **Adaptive Polling**: Steady State (5s) and Cranking Phase (100ms). | **High** |
+| **FR5** | **Battery SOH Analysis** | Profile voltage drop during engine start using **Temperature-Compensated Dynamic Thresholds**. | **High** |
 | **FR6** | **Driving Style Scoring** | Calculate safety and economy indices based on G-sensor and speed data. | **Medium** |
 | **FR7** | **Winter Survival Pack** | Proactive push notifications based on ambient temperature and battery health. | **Medium** |
 | **FR8** | **Value Guard Certificate** | Generate digitally signed PDF reports of service history and driving profiles. | **Medium** |
 | **FR9** | **Accident Event Recorder** | Highlighted backup of the last 30s of telemetry data upon detecting high G-force events. | **Low** |
 | **FR10** | **User Profile** | Vehicle registration via VIN; support for multi-car management per account. | **High** |
+| **FR11** | **Vampire Drain Protection** | **(v1.1 Update)** Automatically suspend data polling if $V_{ocv} < 12.1V$ to prevent battery discharge; resume at $13.0V$. | **High** |
 
 ---
 
@@ -58,12 +59,14 @@ The system consists of a cross-platform mobile application, a cloud-native IoT d
     3. The Cloud API provides the translation and actionable repair suggestions.
 * **Exception:** If offline, the app attempts to translate from local cache or displays a network error.
 
-### UC-2: Automatic Battery Health Check
+### UC-2: Automatic Battery Health Check (v1.1 Update)
 * **Actor:** System (Background Process)
 * **Process:**
-    1. System measures voltage dip during engine ignition.
-    2. Data is ingested into the cloud.
-    3. If a negative trend is detected, the system sends a push notification to the user.
+    1. System detects engine ignition (via voltage spike or BT wake-up) and switches to **High-Speed Sampling (10Hz)**.
+    2. System measures the minimum cranking voltage ($V_{min}$).
+    3. System retrieves ambient temperature via OpenWeatherMap API and determines the **Dynamic Threshold ($V_{crit}$)**.
+    4. Data is ingested into the cloud.
+    5. If $V_{min} < V_{crit}$ or a negative trend is detected, the system sends a push notification to the user.
 
 ### UC-3: Certificate Request
 * **Actor:** User
@@ -97,4 +100,4 @@ The system consists of a cross-platform mobile application, a cloud-native IoT d
 
 * **User Interface (UI):** Modern "cardiovascular" color coding (Green/Yellow/Red) for status indicators.
 * **Hardware Interface:** Standard ELM327 AT command set.
-* **Software Interface:** OpenWeatherMap API integration for external temperature data (Winter Pack).
+* **Software Interface:** **OpenWeatherMap API** integration for external temperature data (Winter Pack & Dynamic SOH).
