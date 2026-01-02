@@ -291,3 +291,96 @@ resource "aws_lambda_layer_version" "openai_layer" {
   compatible_runtimes = ["python3.9"]
   source_code_hash    = filebase64sha256("openai_layer.zip")
 }
+
+# --- 16. GOLD LAYER: VEHICLE INSIGHTS (SOH & Monitoring) ---
+resource "aws_dynamodb_table" "vehicle_insights" {
+  name           = "smartdrive-vehicle-insights"
+  billing_mode   = "PAY_PER_REQUEST"
+  hash_key       = "vin"
+  range_key      = "timestamp"
+
+  attribute {
+    name = "vin"
+    type = "S"
+  }
+
+  attribute {
+    name = "timestamp"
+    type = "S"
+  }
+
+  tags = {
+    Project = "SmartDrive"
+    Layer   = "Gold"
+  }
+}
+
+# ---17. GOLD PROCESSOR ARTIFACT ---
+data "archive_file" "gold_processor_zip" {
+  type        = "zip"
+  source_dir  = "${path.module}/../lambda_functions/gold_processor"
+  output_path = "${path.module}/gold_processor.zip"
+  excludes    = ["__pycache__", "*.pyc"]
+}
+
+# --- 18. GOLD PROCESSOR LAMBDA ---
+resource "aws_lambda_function" "gold_processor" {
+  filename         = data.archive_file.gold_processor_zip.output_path
+  function_name    = "smartdrive-gold-processor"
+  role             = aws_iam_role.lambda_exec_role.arn
+  handler          = "logic.handler"
+  
+  source_code_hash = data.archive_file.gold_processor_zip.output_base64sha256
+  
+  runtime          = "python3.9"
+  timeout          = 30
+  memory_size      = 256
+  
+  layers = [
+    "arn:aws:lambda:eu-central-1:336392948345:layer:AWSSDKPandas-Python39:12"
+  ]
+
+  environment {
+    variables = {
+      INSIGHTS_TABLE = aws_dynamodb_table.vehicle_insights.name
+    }
+  }
+}
+
+# --- 19. IAM PERMISSIONS FOR GOLD LAYER ---
+resource "aws_iam_role_policy" "gold_lambda_policy" {
+  name = "smartdrive-gold-lambda-policy"
+  role = aws_iam_role.lambda_exec_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action   = ["dynamodb:PutItem", "dynamodb:GetItem", "dynamodb:Query"]
+        Effect   = "Allow"
+        Resource = aws_dynamodb_table.vehicle_insights.arn
+      }
+    ]
+  })
+}
+
+# --- 20. S3 TRIGGER FOR GOLD LAYER ---
+resource "aws_lambda_permission" "allow_s3_silver" {
+  statement_id  = "AllowExecutionFromS3Silver"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.gold_processor.function_name
+  principal     = "s3.amazonaws.com"
+  source_arn    = aws_s3_bucket.silver.arn
+}
+
+resource "aws_s3_bucket_notification" "silver_trigger" {
+  bucket = aws_s3_bucket.silver.id
+
+  lambda_function {
+    lambda_function_arn = aws_lambda_function.gold_processor.arn
+    events              = ["s3:ObjectCreated:*"]
+    filter_suffix       = ".parquet"
+  }
+  
+  depends_on = [aws_lambda_permission.allow_s3_silver]
+}

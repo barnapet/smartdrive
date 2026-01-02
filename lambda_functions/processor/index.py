@@ -1,27 +1,27 @@
-import os
+import json
 from config import ProcessorConfig
-from repository import S3Repository
-from service import ETLService
-
-# Globális inicializálás (Warm Start optimalizáció)
-config = ProcessorConfig()
-silver_bucket_name = os.environ.get('SILVER_BUCKET_NAME')
-repo = S3Repository(silver_bucket=silver_bucket_name)
-etl_service = ETLService(repo, config)
+from domain.math_services import CrankingAnalysisContext, PlateauAveragingProcessor
+# from infrastructure.repository import SilverRepository (Feltételezett repo kód)
 
 def lambda_handler(event, context):
-    processed_count = 0
+    config = ProcessorConfig()
     
-    for record in event['Records']:
-        try:
-            bucket = record['s3']['bucket']['name']
-            key = record['s3']['object']['key']
+    # Stratégia kiválasztása (Lead-Acid / AGM alapértelmezett)
+    # v1.4: Plateau Averaging is the current industry standard for SOH[cite: 63, 209].
+    strategy = PlateauAveragingProcessor()
+    analyzer = CrankingAnalysisContext(strategy)
+    
+    for record in event.get('Records', []):
+        # 1. Adat kinyerése
+        payload = json.loads(record['body'])
+        points = payload.get('voltage_samples', []) # (timestamp, voltage) list
+        
+        # 2. Jelfeldolgozás (Domain Layer)
+        v_min_refined = analyzer.analyze(points, config)
+        
+        if v_min_refined:
+            print(f"Validated Plateau Voltage: {v_min_refined}V [cite: 48]")
+            # 3. Mentés a Silver Layer-be (Infrastructure Layer)
+            # repo.save_to_silver(vin, v_min_refined, payload)
             
-            etl_service.process_file(bucket, key)
-            processed_count += 1
-            
-        except Exception as e:
-            # Itt később DLQ (Dead Letter Queue) kezelés ajánlott
-            print(f"CRITICAL ERROR processing {record['s3']['object']['key']}: {str(e)}")
-            
-    return {"processed_count": processed_count}
+    return {"status": "processed"}
