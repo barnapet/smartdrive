@@ -1,102 +1,84 @@
-import json
-import logging
 import time
-from dataclasses import asdict
-from .interfaces import OBDProvider, CloudPublisher
+import logging
+import os
+from .providers.real import RealOBDProvider
+from .domain import TelemetryData
 
-class SmartDriveMonitor:
-    """
-    Main monitoring logic for the SmartDrive platform.
-    Implements adaptive sampling and battery protection.
-    """
-    # Thresholds based on System Design v1.2
-    V_VAMPIRE_CUTOFF = 12.1  # Polling stops below this value
-    V_VAMPIRE_RESUME = 13.0  # Polling resumes when alternator is active
+class SmartDriveApp:
+    # --- CONSTANTS BASED ON V1.3 SPECIFICATION ---
+    V_VAMPIRE_THRESHOLD = 11.5  # Protection threshold (Battery safety)
+    V_RESUME_THRESHOLD = 13.0   # Resumption threshold (Charging detected)
+    CRANKING_RPM_LIMIT = 600    # Cranking/Idle RPM threshold
     
-    # Sampling Intervals
-    INTERVAL_CRANKING = 0.1     # 10Hz
-    INTERVAL_STEADY = 5.0       # 0.2Hz
-    INTERVAL_POST_DRIVE = 60.0  # 1 minute
-    INTERVAL_SLEEP = 1800.0     # 30 minutes
+    # Sampling intervals (in seconds)
+    INTERVAL_CRANKING = 0.1     # 10Hz (Target for high-resolution start)
+    INTERVAL_STEADY = 5.0       # 0.2Hz (Normal operation)
+    INTERVAL_SLEEP = 1800.0     # 30 minutes (Deep power save)
 
-    def __init__(self, provider: OBDProvider, publisher: CloudPublisher):
-        self.provider = provider
-        self.publisher = publisher
-        self.is_running = False
-        self.power_saving_active = False
+    def __init__(self, vin: str, port: str = None):
+        self.provider = RealOBDProvider(vin=vin, port=port)
         self.current_interval = self.INTERVAL_STEADY
+        self.power_saving_active = False
+        logging.info("🚀 SmartDrive Gateway v1.3 initialized.")
 
-    def start(self):
-        if self.provider.connect():
-            self.is_running = True
-            self._main_loop()
+    def run(self):
+        """Main execution loop with adaptive sampling logic."""
+        while True:
+            if not self.provider.connect():
+                logging.warning("⏳ Reconnecting to OBD...")
+                time.sleep(5)
+                continue
 
-    def _main_loop(self):
-        logging.info("🚀 SmartDrive monitoring loop initiated...")
-        try:
-            while self.is_running:
-                # 1. Fetch data from provider
-                data = self.provider.fetch_data()
-                
-                if data:
-                    # 2. Check for battery protection (FR11)
-                    self._handle_battery_protection(data.voltage)
+            try:
+                while True:
+                    data = self.provider.fetch_data()
+                    if not data:
+                        break
+
+                    self._process_adaptive_logic(data)
                     
+                    # Data transmission (Simulated cloud/logging)
                     if not self.power_saving_active:
-                        # 3. Adjust sampling rate based on vehicle state (FR4)
-                        self._adjust_sampling_rate(data.rpm)
-                        self._publish_telemetry(data)
-                
-                # 4. Adaptive wait based on current state
-                time.sleep(self.current_interval)
-                
-        except KeyboardInterrupt:
-            logging.info("🛑 Monitoring stopped by user.")
+                        self._ingest_to_cloud(data)
 
-    def _handle_battery_protection(self, voltage: float):
+                    time.sleep(self.current_interval)
+
+            except Exception as e:
+                logging.error(f"❌ Runtime error: {e}")
+                time.sleep(1)
+
+    def _process_adaptive_logic(self, data: TelemetryData):
         """
-        Suspends polling if battery voltage is too low to prevent discharge.
+        Logic for adaptive sampling rates and battery protection.
         """
-        if not self.power_saving_active and voltage < self.V_VAMPIRE_CUTOFF:
-            self.power_saving_active = True
+        # 1. VAMPIRE DRAIN PROTECTION (RPM=0 and low voltage)
+        if data.rpm == 0 and data.voltage < self.V_VAMPIRE_THRESHOLD:
+            if not self.power_saving_active:
+                logging.warning(f"⚠️ Power Saving Active: {data.voltage}V < {self.V_VAMPIRE_THRESHOLD}V")
+                self.power_saving_active = True
             self.current_interval = self.INTERVAL_SLEEP
-            self._notify_status("Power Saving Mode: Monitoring paused to protect battery.") #
-            logging.warning(f"⚠️ Vampire Drain Protection triggered at {voltage}V.")
-        
-        elif self.power_saving_active and voltage >= self.V_VAMPIRE_RESUME:
+
+        # 2. RESUMPTION (Alternator charging detected)
+        elif self.power_saving_active and data.voltage >= self.V_RESUME_THRESHOLD:
+            logging.info(f"🟢 Power Saving Deactivated: {data.voltage}V (Alternator Active)")
             self.power_saving_active = False
             self.current_interval = self.INTERVAL_STEADY
-            logging.info(f"⚡ Voltage recovered ({voltage}V). Resuming normal operation.")
 
-    def _adjust_sampling_rate(self, rpm: float):
-        """
-        Adaptive Sampling Logic (FR4):
-        - 10Hz during Cranking Phase
-        - 0.2Hz during Steady State (Running)
-        - 1-minute interval for Post-Drive
-        """
-        if 0 < rpm < 600:
-            # Cranking Phase detected
+        # 3. READY / CRANK PHASE (Ignition ON or engine cranking)
+        elif data.rpm < self.CRANKING_RPM_LIMIT and not self.power_saving_active:
+            # Switch to 10Hz when ignition is ON (RPM=0 but voltage is healthy)
             self.current_interval = self.INTERVAL_CRANKING
-        elif rpm >= 600:
-            # Engine is running (Steady State)
+
+        # 4. STEADY STATE (Normal engine operation)
+        elif data.rpm >= self.CRANKING_RPM_LIMIT:
             self.current_interval = self.INTERVAL_STEADY
-        else:
-            # Engine is OFF (Post-Drive/Sleep)
-            self.current_interval = self.INTERVAL_POST_DRIVE
 
-    def _notify_status(self, message: str):
-        """Sends operational status alerts to the cloud."""
-        alert_payload = {
-            "type": "STATUS_ALERT",
-            "message": message,
-            "timestamp": int(time.time())
-        }
-        self.publisher.publish("vehicle/status/alerts", json.dumps(alert_payload))
+    def _ingest_to_cloud(self, data: TelemetryData):
+        """Forward data to AWS IoT Core via MQTT."""
+        # MQTT publishing logic goes here
+        logging.info(f"📊 Ingesting: {data.voltage}V | {data.rpm} RPM | Interval: {self.current_interval}s")
 
-    def _publish_telemetry(self, data):
-        """Serializes and sends telemetry data."""
-        payload = json.dumps(asdict(data))
-        topic = f"vehicle/{data.vin}/telemetry"
-        if self.publisher.publish(topic, payload):
-            logging.info(f"📡 Telemetry sent (Rate: {1/self.current_interval:.1f}Hz)")
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
+    app = SmartDriveApp(vin="PROD-VIN-2026", port="/dev/rfcomm0")
+    app.run()

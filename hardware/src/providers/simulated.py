@@ -29,8 +29,8 @@ class SimulatedOBDProvider(OBDProvider):
         self.current_temp += random.uniform(-0.1, 0.5) if self.is_engine_running else -0.2
         
         # Simulate voltage behavior
-        # Typical: 13.5V-14.4V (Running), 12.1V-12.8V (Stopped)
-        base_voltage = 13.8 if self.is_engine_running else 12.4
+        # Typical: 13.5V-14.4V (Running), 11.5V-12.8V (Stopped)
+        base_voltage = 13.8 if self.is_engine_running else 11.8
         simulated_voltage = round(base_voltage + random.uniform(-0.3, 0.3), 2)
 
         return TelemetryData(
