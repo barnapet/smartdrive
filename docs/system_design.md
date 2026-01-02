@@ -1,9 +1,10 @@
-x# System Design Document (SDD): SmartDrive Platform (v1.2)
+# System Design Document (SDD): SmartDrive Platform (v1.3)
 
-**Version:** 1.2
-**Date:** Dec 2025
+**Version:** 1.3
+**Date:** Jan 2026
 **Project:** SmartDrive OBD-II Data Platform & Ecosystem
 **Author:** Peter Barna
+**Status:** Updated with v1.3 Winter Protection and Adaptive Sampling Triggers
 
 ---
 
@@ -14,7 +15,7 @@ The system is built on a modern, cloud-native **Event-driven Architecture** util
 * **Client Side:** Cross-platform mobile application (Flutter or React Native). To ensure stability and offline functionality, it utilizes an **SQLite-based Local Cache**.
 * **Communication Layer:** **AWS IoT Core**. Data transmission between the vehicle-mounted OBD unit and the phone (Bluetooth), and subsequently between the phone and the cloud, is handled via the **MQTT protocol**.
 * **Compute Layer:** **AWS Lambda (Serverless)**. Processing logic is executed only upon data ingestion, eliminating continuous server maintenance costs.
-* **External APIs: (v1.1 Update)**
+* **External APIs:**
     * **OpenWeatherMap:** Provides external ambient temperature data for the "Winter Survival Pack" and dynamic SOH logic.
     * **OpenAI API (gpt-4o-mini):** Generative diagnostic engine used for interpreting rare or manufacturer-specific DTC codes.
 
@@ -33,18 +34,18 @@ The platform follows the Medallion data design pattern with tables for Users, Ve
 
 | Table Name | Description | Key Attributes |
 | :--- | :--- | :--- |
-| **Users** | User profiles and subscription status. | `user_id` (PK), `email`, `password_hash` |
-| **Vehicles** | Master data of registered vehicles. | `vin` (PK), `user_id` (FK), `model_info` |
-| **Telemetry** | Cleaned data with normalized physical units. | `telemetry_id` (PK), `vin` (FK), `pid_code`, `value` |
-| **DTC_Global_Cache** | **(New)** Global table for pre-translated codes to minimize AI costs. | `dtc_id` (PK), `description`, `is_ai_generated` |
-| **VehicleInsights** | Pre-calculated indicators and analytics (Gold level). | `vin` (PK/FK), `battery_health`, `driver_score`, `dtc_description_hu` |
+| **Users** | User profiles and subscription status. | `user_id` (PK), `email` |
+| **Vehicles** | Master data of registered vehicles. | `vin` (PK), `user_id` (FK) |
+| **Telemetry** | Cleaned data with normalized physical units. | `telemetry_id` (PK), `vin` (FK) |
+| **DTC_Global_Cache** | Global table for pre-translated codes to minimize AI costs. | `dtc_id` (PK), `description` |
+| **VehicleInsights** | Pre-calculated indicators and analytics (Gold level). | `vin` (PK/FK), `battery_health` |
 
 ---
 
 ## 3. Algorithms & Business Logic
 The system transforms raw telemetry data (Voltage, RPM, Speed) into actionable intelligence.
 
-### 3.1 Battery Health Prediction (v1.2 Update)
+### 3.1 Battery Health Prediction (v1.3 Update)
 The algorithm analyzes the **voltage drop** during the engine cranking phase using a **Temperature-Compensated Dynamic Threshold ($V_{crit}$)**.
 
 * **Dynamic Threshold Logic:**
@@ -59,7 +60,7 @@ The algorithm analyzes the **voltage drop** during the engine cranking phase usi
 This algorithm interprets Diagnostic Trouble Codes through a tiered lookup strategy:
 1. **Tier 1 (SAE Library):** Local lookup of standard P0xxx codes.
 2. **Tier 2 (Global Cache):** Querying the `DTC_Global_Cache` in DynamoDB for previously translated codes.
-3. **Tier 3 (AI Fallback):** Calling the OpenAI API for human-readable explanations, which is then stored in the Tier 2 cache.
+3. **Tier 3 (AI Fallback):** Calling the OpenAI API (gpt-4o-mini) for human-readable explanations, which are then stored in the Tier 2 cache.
 
 ---
 
@@ -83,21 +84,21 @@ Multi-layered protection following the **"Defense in Depth"** principle.
 
 ### 5.2 Authentication & Secrets
 * **Identity:** Verified using **JSON Web Tokens (JWT)**.
-* **Secrets Management (New):** OpenAI API keys and database credentials are stored in **AWS Secrets Manager** to prevent hardcoding in source files.
+* **Secrets Management:** OpenAI API keys and database credentials are stored in **AWS Secrets Manager**.
 
-### 5.3 Energy Efficiency (Vampire Drain Protection)
+### 5.3 Energy Efficiency (Vampire Drain Protection - v1.3 Update)
 To prevent the ELM327 adapter from draining the vehicle battery during "Engine OFF" periods:
-* **Voltage-based Cut-off:** If $V_{ocv}$ falls below **12.1V**, all background polling is suspended.
+* **Voltage-based Cut-off:** If $V_{ocv}$ falls below **11.5V** while the engine is OFF (RPM=0), all background polling is suspended.
 * **Resume Condition:** Data ingestion resumes only when voltage reaches **13.0V** (indicating the alternator is active).
 * **User Notification:** A push notification is sent: *"Power Saving Mode: Monitoring paused to protect battery."*
 
 ---
 
-## 6. Data Flow & Resilience (v1.2 Update)
+## 6. Data Flow & Resilience (v1.3 Update)
 
 1.  **Collection (Adaptive Sampling):**
-    * **Cranking Phase:** High-speed sampling at **10 Hz (100 ms)** to accurately capture $V_{min}$.
-    * **Steady State (Running):** Standard **0.2 Hz (5 s)** sampling for operational telemetry.
+    * **Ready/Crank Phase (v1.3 Update):** High-speed sampling at **10 Hz (100 ms)** starts immediately upon **Ignition ON (RPM=0)** to proactively capture the $V_{min}$ curve.
+    * **Steady State (Running):** Standard **0.2 Hz (5 s)** sampling for operational telemetry once RPM ≥ 600.
     * **Post-Drive (0-30 min OFF):** 1-minute intervals to monitor surface charge decay.
     * **Standard Sleep (30 min-24 h OFF):** 30-minute intervals for discharge tracking.
     * **Deep Sleep (>24 h OFF):** Sampling suspended to maximize protection.

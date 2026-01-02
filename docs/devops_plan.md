@@ -1,10 +1,11 @@
 # DevOps & Infrastructure Plan (IaC)
 
-**Version:** 1.0
-**Date:** Dec 2025
+**Version:** 1.3
+**Date:** Jan 2026
 **Project:** SmartDrive OBD-II Data Platform & Ecosystem
 **Focus:** CI/CD Pipelines, Infrastructure Strategy, and Cloud Observability
 **Author:** Peter Barna
+**Status:** Validated for v1.3 Battery Logic (11.5V / 10Hz)
 
 ---
 
@@ -16,7 +17,7 @@ The primary objective is to automate the software lifecycle, ensuring that every
 
 1.  **Code Push:** A developer pushes a new feature or fix to the `main` branch.
 2.  **Linting & Static Analysis:** The system automatically checks for code quality and security vulnerabilities (e.g., using Flake8 for Python or SonarQube).
-3.  **Unit & Logic Testing:** Automated execution of mathematical test cases, specifically validating the Battery SOH and Driver Scoring algorithms.
+3.  **Unit & Logic Testing:** **(v1.3 Update)** Automated execution of test cases validating the **11.5V Vampire Drain cut-off** and the **Ignition-priority sampling trigger**.
 4.  **Infrastructure Validation:** The CI environment runs a "Plan" phase to preview changes to the cloud resources.
 5.  **Automated Deployment:** Once all tests pass, the system updates the AWS Lambda functions and synchronizes the cloud environment.
 

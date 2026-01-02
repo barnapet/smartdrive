@@ -12,7 +12,7 @@
 | :--- | :--- | :--- |
 | **Mechanic-Translator** | Instant interpretation of DTC (Diagnostic Trouble Codes). | Reduces repair costs and information asymmetry. |
 | **Value Guard Certificate** | Certified, digitally signed PDF reports of vehicle history. | Increases resale value and builds buyer trust. |
-| **Battery Health Prediction** | Time-series analysis of cranking voltage (SOH prediction). | Prevents unexpected breakdowns. |
+| **Battery Health Prediction** | **(v1.3 Update)** Analysis of cranking voltage ($V_{min}$) starting from Ignition ON (10Hz). | Prevents unexpected breakdowns. |
 | **Driving Style Profiling** | Telemetry-based scoring (braking, acceleration, idling). | Lowers fuel consumption and promotes safety. |
 | **Legal-Light** | Archiving telemetry for critical events (hard braking, collisions). | Objective evidence in legal or insurance disputes. |
 
@@ -97,13 +97,14 @@ This tool bypasses automatic discovery and forces a stable connection on /dev/rf
 sudo SMARTDRIVE_MODE=REAL ./sd-env/bin/python3 scripts/obd_diagnostic.py
 ```
 
-## Expected Metrics
+### Expected Metrics (v1.3 Updated)
 
-| Metric  | Target Value       | Description                                         |
-|---------|--------------------|-----------------------------------------------------|
-| Voltage | 13.5V – 14.4V      | Indicates the alternator is charging the battery.  |
-| RPM     | ~800 (idle)        | Real-time engine revolutions per minute.           |
-| Speed   | 0+ km/h            | Current vehicle speed retrieved from the ECU.      |
+| Metric | Target Value | Description |
+| :--- | :--- | :--- |
+| **Voltage** | 13.5V – 14.4V | Indicates the alternator is charging the battery. |
+| **$V_{save}$** | 11.5V | (New) Threshold for Vampire Drain Protection. |
+| **Sampling** | 10Hz | (New) Target rate during Ready/Crank phase. |
+| **RPM** | ~800 (idle) | Real-time engine revolutions per minute. |
 
 ---
 
