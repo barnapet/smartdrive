@@ -1,3 +1,14 @@
+# --- PROCESSOR ARTIFACT GENERATION ---
+data "archive_file" "processor_zip" {
+  type        = "zip"
+  # Packaging the entire directory, not just a single file
+  source_dir  = "${path.module}/../lambda_functions/processor"
+  output_path = "${path.module}/processor.zip"
+  
+  # Exclude build artifacts to minimize package size
+  excludes    = ["__pycache__", "*.pyc"]
+}
+
 # --- 1. PROVIDER AND BASICS ---
 provider "aws" {
   region = "eu-central-1" # Frankfurt
@@ -99,15 +110,26 @@ resource "aws_iot_topic_rule" "obd_telemetry_rule" {
 
 # --- 6. SILVER PROCESSING LAMBDA ---
 resource "aws_lambda_function" "silver_processor" {
-  filename      = "processor.zip"
-  function_name = "smartdrive-silver-processor"
-  role          = aws_iam_role.lambda_exec_role.arn # Must follow Least Privilege
-  handler       = "index.lambda_handler"
-  runtime       = "python3.9"
+  filename         = data.archive_file.processor_zip.output_path
+  function_name    = "smartdrive-silver-processor"
+  role             = aws_iam_role.lambda_exec_role.arn
+  handler          = "index.lambda_handler"
+  
+  # Hash based on the entire ZIP content (triggers update on any file change)
+  source_code_hash = data.archive_file.processor_zip.output_base64sha256
+  
+  runtime          = "python3.9"
+  timeout          = 60       
+  memory_size      = 512      
+  
+  # AWS SDK for Pandas Layer (Frankfurt / Py3.9)
+  layers = [
+    "arn:aws:lambda:eu-central-1:336392948345:layer:AWSSDKPandas-Python39:12"
+  ]
 
   environment {
     variables = {
-      SILVER_BUCKET = aws_s3_bucket.silver.id
+      SILVER_BUCKET_NAME = aws_s3_bucket.silver.bucket
     }
   }
 }

@@ -81,3 +81,7 @@ hardware/certs/*.key
 **/certs/*.crt
 **/certs/*.key
 certs/
+
+# --- Test Artifacts ---
+tests/payloads/*.json
+
