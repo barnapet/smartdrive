@@ -1,29 +1,31 @@
 import time
 import logging
-import os
+from datetime import datetime
 from .providers.real import RealOBDProvider
 from .domain import TelemetryData
 
 class SmartDriveApp:
-    # --- CONSTANTS BASED ON V1.3 SPECIFICATION ---
-    V_VAMPIRE_THRESHOLD = 11.5  # Protection threshold (Battery safety)
-    V_RESUME_THRESHOLD = 13.0   # Resumption threshold (Charging detected)
-    CRANKING_RPM_LIMIT = 600    # Cranking/Idle RPM threshold
+    # --- CONSTANTS ---
+    V_VAMPIRE_THRESHOLD = 11.5
+    V_RESUME_THRESHOLD = 13.0
+    CRANKING_RPM_LIMIT = 600
     
-    # Sampling intervals (in seconds)
-    INTERVAL_CRANKING = 0.1     # 10Hz (Target for high-resolution start)
-    INTERVAL_STEADY = 5.0       # 0.2Hz (Normal operation)
-    INTERVAL_SLEEP = 1800.0     # 30 minutes (Deep power save)
+    INTERVAL_CRANKING = 0.1
+    INTERVAL_STEADY = 5.0
+    INTERVAL_SLEEP = 1800.0
 
-    def __init__(self, vin: str, port: str = None):
+    def __init__(self, vin: str, port: str = None, publisher=None):
+        self.vin = vin
         self.provider = RealOBDProvider(vin=vin, port=port)
+        self.publisher = publisher
+        
         self.current_interval = self.INTERVAL_STEADY
         self.power_saving_active = False
         logging.info("🚀 SmartDrive Gateway v1.3 initialized.")
 
     def run(self):
-        """Main execution loop with adaptive sampling logic."""
         while True:
+            # Újracsatlakozási logika
             if not self.provider.connect():
                 logging.warning("⏳ Reconnecting to OBD...")
                 time.sleep(5)
@@ -37,7 +39,6 @@ class SmartDriveApp:
 
                     self._process_adaptive_logic(data)
                     
-                    # Data transmission (Simulated cloud/logging)
                     if not self.power_saving_active:
                         self._ingest_to_cloud(data)
 
@@ -48,37 +49,48 @@ class SmartDriveApp:
                 time.sleep(1)
 
     def _process_adaptive_logic(self, data: TelemetryData):
-        """
-        Logic for adaptive sampling rates and battery protection.
-        """
-        # 1. VAMPIRE DRAIN PROTECTION (RPM=0 and low voltage)
+        # 1. Vampire Drain Protection
         if data.rpm == 0 and data.voltage < self.V_VAMPIRE_THRESHOLD:
             if not self.power_saving_active:
                 logging.warning(f"⚠️ Power Saving Active: {data.voltage}V < {self.V_VAMPIRE_THRESHOLD}V")
                 self.power_saving_active = True
             self.current_interval = self.INTERVAL_SLEEP
 
-        # 2. RESUMPTION (Alternator charging detected)
+        # 2. Resumption
         elif self.power_saving_active and data.voltage >= self.V_RESUME_THRESHOLD:
-            logging.info(f"🟢 Power Saving Deactivated: {data.voltage}V (Alternator Active)")
+            logging.info(f"🟢 Power Saving Deactivated: {data.voltage}V")
             self.power_saving_active = False
             self.current_interval = self.INTERVAL_STEADY
 
-        # 3. READY / CRANK PHASE (Ignition ON or engine cranking)
+        # 3. Cranking Phase
         elif data.rpm < self.CRANKING_RPM_LIMIT and not self.power_saving_active:
-            # Switch to 10Hz when ignition is ON (RPM=0 but voltage is healthy)
             self.current_interval = self.INTERVAL_CRANKING
 
-        # 4. STEADY STATE (Normal engine operation)
+        # 4. Steady State
         elif data.rpm >= self.CRANKING_RPM_LIMIT:
             self.current_interval = self.INTERVAL_STEADY
 
     def _ingest_to_cloud(self, data: TelemetryData):
         """Forward data to AWS IoT Core via MQTT."""
-        # MQTT publishing logic goes here
         logging.info(f"📊 Ingesting: {data.voltage}V | {data.rpm} RPM | Interval: {self.current_interval}s")
+        
+        if self.publisher:
+            # JAVÍTÁS: Időbélyeg konverzió (int -> datetime -> isoformat)
+            ts = data.timestamp
+            if isinstance(ts, (int, float)):
+                ts_str = datetime.fromtimestamp(ts).isoformat()
+            else:
+                # Ha már datetime objektum
+                ts_str = ts.isoformat()
 
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
-    app = SmartDriveApp(vin="PROD-VIN-2026", port="/dev/rfcomm0")
-    app.run()
+            payload = {
+                "vin": self.vin,
+                "timestamp": ts_str,
+                "rpm": data.rpm,
+                "voltage": data.voltage,
+                "pids": [
+                    {"pid_code": "RPM", "value": data.rpm, "timestamp": ts_str},
+                    {"pid_code": "BATTERY_VOLTAGE", "value": data.voltage, "timestamp": ts_str}
+                ]
+            }
+            self.publisher.publish_telemetry(payload)

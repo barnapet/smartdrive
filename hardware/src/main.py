@@ -4,18 +4,18 @@ import sys
 from AWSIoTPythonSDK.MQTTLib import AWSIoTMQTTClient
 from .providers.simulated import SimulatedOBDProvider
 from .providers.real import RealOBDProvider
-from .app import SmartDriveMonitor
+# JAVÍTÁS 1: A helyes osztály importálása
+from .app import SmartDriveApp
 from .infrastructure import AWSCloudPublisher
 
 def create_aws_iot_client(vin: str):
     """
-    Configures the AWS IoT MQTT client with certificates and security settings.
+    Configures the AWS IoT MQTT client.
     """
     client = AWSIoTMQTTClient(vin)
-    # Endpoint from System Design v1.2
+    # Endpoint a te régiódhoz (Frankfurt)
     client.configureEndpoint("a3de8eyv1wr96p-ats.iot.eu-central-1.amazonaws.com", 8883)
     
-    # Path to certificates as defined in the project structure
     cert_dir = "hardware/certs"
     client.configureCredentials(
         f"{cert_dir}/AmazonRootCA1.pem",
@@ -23,50 +23,47 @@ def create_aws_iot_client(vin: str):
         f"{cert_dir}/certificate.pem.crt"
     )
 
-    # Connection resilience settings
     client.configureAutoReconnectBackoffTime(1, 32, 20)
-    client.configureOfflinePublishQueueing(-1)  # Infinite queuing for NFR4 (Offline Mode)
+    client.configureOfflinePublishQueueing(-1)
     client.configureDrainingFrequency(2)
     client.configureConnectDisconnectTimeout(10)
     client.configureMQTTOperationTimeout(5)
     return client
 
 def main():
-    # Set up centralized logging
     logging.basicConfig(
         level=logging.INFO, 
         format='%(asctime)s [%(levelname)s] %(message)s'
     )
     
-    logging.info("Starting SmartDrive Edge Gateway...")
-
-    # Configuration from environment or defaults
+    # Környezeti változók kezelése
     VIN = os.getenv("SMARTDRIVE_VIN", "TESTVIN123456789")
     MODE = os.getenv("SMARTDRIVE_MODE", "SIMULATED")
-    PORT = os.getenv("SMARTDRIVE_PORT", None) # e.g., /dev/rfcomm0
+    # JAVÍTÁS 2: OBD_PORT használata, hogy kompatibilis legyen a paranccsal
+    PORT = os.getenv("OBD_PORT", "/dev/ttyUSB0") 
 
-    # 1. Initialize AWS Connectivity
-    aws_client = create_aws_iot_client(VIN)
-    publisher = AWSCloudPublisher(aws_client)
-    
+    logging.info(f"🚀 Starting SmartDrive Edge Gateway in [{MODE}] mode...")
+
+    # 1. AWS Kapcsolat felépítése
     try:
+        aws_client = create_aws_iot_client(VIN)
         if aws_client.connect():
-            logging.info(f"✅ Successfully connected to AWS IoT Core for VIN: {VIN}")
+            logging.info(f"✅ AWS Cloud Connected (VIN: {VIN})")
         else:
-            logging.error("❌ Failed to connect to AWS IoT Core. Check credentials and network.")
-            sys.exit(1)
+            logging.error("❌ AWS Connection Failed")
+            # Éles tesztnél nem lépünk ki, hogy a logokat lássuk, de a felhő nem fog menni
+    except Exception as e:
+        logging.error(f"⚠️ Cloud Connection Error: {e}")
+        aws_client = None
 
-        # 2. Initialize Data Provider (FR1)
-        if MODE == "REAL":
-            logging.info(f"🚗 Initializing REAL OBD-II Provider on port: {PORT or 'Auto-discovery'}")
-            provider = RealOBDProvider(VIN, port=PORT)
-        else:
-            logging.info("🎮 Initializing SIMULATED OBD-II Provider")
-            provider = SimulatedOBDProvider(VIN)
+    publisher = AWSCloudPublisher(aws_client) if aws_client else None
 
-        # 3. Start the Monitoring Engine (Adaptive Polling & Protection)
-        monitor = SmartDriveMonitor(provider, publisher)
-        monitor.start()
+    # 2. App indítása
+    try:
+        # JAVÍTÁS 3: Dependency Injection
+        # Átadjuk a VIN-t, Portot és a Publishert az App-nak
+        app = SmartDriveApp(vin=VIN, port=PORT, publisher=publisher)
+        app.run()
 
     except Exception as e:
         logging.critical(f"💥 Critical system failure: {e}")

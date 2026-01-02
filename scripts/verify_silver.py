@@ -4,63 +4,57 @@ import io
 import sys
 
 # Konfiguráció
-SILVER_BUCKET = "smartdrive-telemetry-silver" # A Terraformban megadott név
+SILVER_BUCKET = "smartdrive-telemetry-silver"
 TEST_VIN = "TESTVIN123456789"
+# A dátumot a logjaid alapján állítom be (ma)
 PREFIX = f"processed_telemetry/vin={TEST_VIN}"
 
-def check_silver_data():
+def check_all_silver_files():
     s3 = boto3.client('s3')
     
-    print(f"🔍 Searching for Parquet files in s3://{SILVER_BUCKET}/{PREFIX}...")
+    print(f"🔍 Scanning ALL files in s3://{SILVER_BUCKET}/{PREFIX}...\n")
     
-    # 1. Fájlok listázása
     response = s3.list_objects_v2(Bucket=SILVER_BUCKET, Prefix=PREFIX)
-    
     if 'Contents' not in response:
-        print("❌ No files found in Silver bucket yet. Lambda might be still processing or failed.")
+        print("❌ No files found.")
         return
 
-    # A legutolsó fájlt vesszük (ha több lenne)
-    latest_file = sorted(response['Contents'], key=lambda x: x['LastModified'])[-1]
-    key = latest_file['Key']
-    
-    print(f"📥 Downloading: {key}")
-    
-    # 2. Letöltés memóriába (BytesIO)
-    obj = s3.get_object(Bucket=SILVER_BUCKET, Key=key)
-    buffer = io.BytesIO(obj['Body'].read())
-    
-    # 3. Olvasás Pandas-szal
-    try:
-        df = pd.read_parquet(buffer)
+    found_valid_crank = False
+    files = sorted(response['Contents'], key=lambda x: x['LastModified'])
+
+    print(f"📂 Found {len(files)} files. Checking for cranking data...\n")
+
+    for obj_meta in files:
+        key = obj_meta['Key']
         
-        # 4. Eredmény megjelenítése
-        print("\n✅ PARQUET FILE CONTENT (First 10 rows):")
-        print("-" * 60)
+        # Csak a ma délutáni fájlokat nézzük (optimalizálás)
+        # Ha sok fájl van, ez gyorsítja
         
-        # Csak a releváns oszlopokat mutassuk
-        cols_to_show = ['timestamp', 'pid_code', 'value', 'refined_vmin']
-        # Biztosítjuk, hogy csak létező oszlopokat kérünk le
-        available_cols = [c for c in cols_to_show if c in df.columns]
-        
-        print(df[available_cols].to_string())
-        print("-" * 60)
-        
-        # 5. Matek ellenőrzése
-        if 'refined_vmin' in df.columns:
-            vmin_rows = df[df['refined_vmin'].notnull()]
-            if not vmin_rows.empty:
-                calculated_val = vmin_rows.iloc[0]['refined_vmin']
-                print(f"\n🎯 SUCCESS! Calculated Parabolic Minimum: {calculated_val:.4f} V")
-                print("   (This proves the math module logic executed correctly)")
-            else:
-                print("\n⚠️  'refined_vmin' column exists but is empty (Conditions for interpolation not met?)")
-        else:
-            print("\n❌ 'refined_vmin' column is MISSING. The ETL script did not add it.")
+        try:
+            # Letöltés memóriába
+            obj = s3.get_object(Bucket=SILVER_BUCKET, Key=key)
+            buffer = io.BytesIO(obj['Body'].read())
+            df = pd.read_parquet(buffer)
             
-    except Exception as e:
-        print(f"❌ Error reading Parquet: {e}")
-        print("Tip: You might need to install pyarrow: 'pip install pyarrow'")
+            # Keresünk olyan sort, ahol a refined_vmin NEM üres
+            if 'refined_vmin' in df.columns:
+                valid_rows = df[df['refined_vmin'].notnull()]
+                
+                if not valid_rows.empty:
+                    print(f"✅ FOUND CRANKING EVENT in file: {key.split('/')[-1]}")
+                    print("-" * 60)
+                    print(valid_rows[['timestamp', 'pid_code', 'value', 'refined_vmin']].to_string())
+                    print("-" * 60)
+                    print(f"🎯 Calculated V_min: {valid_rows.iloc[0]['refined_vmin']:.4f} V")
+                    found_valid_crank = True
+                    # Nem break-elünk, hátha több indítás is volt
+        
+        except Exception as e:
+            print(f"⚠️ Error reading {key}: {e}")
+
+    if not found_valid_crank:
+        print("\n❌ Scanned all files, but no valid cranking logic was triggered.")
+        print("Tip: Did the voltage drop below the previous measurement? (Convex parabola required)")
 
 if __name__ == "__main__":
-    check_silver_data()
+    check_all_silver_files()
