@@ -1,11 +1,11 @@
 # System Design: Algorithms & Logic Plan
 
-**Version:** 1.3
+**Version:** 1.4
 **Date:** Jan 2026
 **Project:** SmartDrive OBD-II Data Platform & Ecosystem
 **Document Status:** Detailed Logic Specification
 **Author:** Peter Barna
-**Status:** Updated with v1.3 $V_{min}$ Refinement and 11.5V Safety Logic
+**Status:** Updated with v1.4 $V_{min}$ Refinement
 
 ---
 
@@ -30,21 +30,23 @@ Each interpretation is assigned a severity level based on the following categori
 ## 2. Battery Health Prediction (SOH)
 This model analyzes the voltage drop during the engine cranking phase to predict failure before it occurs.
 
-### 2.1 Mathematical Model & Data Capture (v1.3 Update)
-Battery internal resistance ($R_i$) increases with degradation. We monitor the relationship between the cranking voltage drop ($V_{drop}$) and the starting current ($I_{start}$):
+### 2.1 Mathematical Model & Signal Processing (v1.4 Update)
+To ensure accuracy and avoid false positives from inductive inrush spikes (Phase 1), the system implements a **100ms Moving Average Filter**[cite: 150, 217].
 
-$$V_{start} = V_{ocv} - (I_{start} \cdot R_i)$$
+**Voltage Plateau Calculation:**
+1. **Inrush Blanking:** Discard the first 100ms of data after starter engagement to ignore the "Hammer Blow" dip.
+2. **Plateau Averaging:** Calculate the mean voltage over the subsequent 500ms (Phase 2) to determine the true $V_{min\_plateau}$.
+3. **Temperature Compensation:** Adjust the critical threshold using a linear model (-18mV/°C):
+   $$V_{crit\_adj} = V_{crit\_25C} - 0.018 \cdot (25 - T_{amb})$$
 
-**High-Fidelity Capture Strategy:**
-1.  **Ignition-Priority Trigger:** High-frequency sampling (Target: 10Hz) starts immediately at **Ignition ON (RPM=0)** to capture the full transient curve.
-2.  **Numerical Refinement (Parabolic Interpolation):** Since hardware latency may limit actual sampling to 3-6 Hz, the system applies a parabolic fit (Quadratic Interpolation) to the lowest measured points to estimate the true $V_{min}$ between samples.
+### 2.2 Decision Logic & Thresholds (v1.4 Optimized)
+**Validation Gates:**
+* **SOC Gate:** If State of Charge (**SOC**) < 70%, the SOH measurement is marked as "Inconclusive" to avoid false failures due to a discharged battery.
+* **Debounce Logic:** A "Critical" status is only confirmed after **3 consecutive driving cycles** failing the threshold.
 
-**Relative Trend Tracking:**
-$$SOH\% = 100 \cdot \left( 1 - \frac{V_{min, t} - V_{min, t-n}}{V_{min, t-n}} \right)$$
-
-### 2.2 Logic Rules (v1.3 Update)
-* **Health Alert:** If the refined $V_{min}$ consistently falls below **9.6V** at standard temperatures, a "Battery Replacement Recommended" alert is triggered.
-* **Vampire Drain Protection (Safety):** If the vehicle is Parked (RPM=0) and $V_{ocv}$ falls below **11.5V**, all polling is suspended to prevent deep discharge.
+**SOH Monitoring Matrix (at 25°C):**
+* **Yellow Alert (Warning):** SOH < 80%. (Message: "Battery life is nearing its end. Plan a check.")
+* **Red Alert (Critical):** SOH < 65-70%. (Message: "Critical battery state. Immediate replacement required.")
 
 ---
 
@@ -64,7 +66,8 @@ $$S = 100 - (w_B \cdot \text{B-count} + w_A \cdot \text{A-count} + w_I \cdot \te
 ## 4. Winter Survival Pack (Context-Aware Logic)
 An event-driven logic designed to prevent "cold start" failures.
 
-### 4.1 Trigger Mechanism
-* **Trigger:** Ambient temperature retrieved from Weather API is **< 0°C**.
-* **Condition:** AND Battery State of Health (**SOH**) is **< 70%**.
-* **Action:** Send a Push Notification: *"Warning! Due to freezing temperatures, your battery may fail tomorrow morning. We recommend a health check or charging today."*
+### 4.1 Winter Survival Pack (Proactive Logic)
+* **Trigger:** Forecasted temperature < 0°C within 24 hours.
+* **Condition:** AND Battery **SOH < 85%** (higher safety margin for cold viscosity).
+* **Safety Condition:** OR **SOC < 60%** (prevents electrolyte freezing).
+* **Timing:** Alert sent 24 hours prior to forecasted freeze.

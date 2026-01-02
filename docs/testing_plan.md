@@ -1,6 +1,6 @@
-# Testing Plan: SmartDrive Platform (v1.3)
+# Testing Plan: SmartDrive Platform (v1.4)
 
-**Version:** 1.3
+**Version:** 1.4
 **Date:** Jan 2026
 **Project:** SmartDrive OBD-II Data Platform & Ecosystem
 **Focus:** Quality Assurance, Validation, and Verification
@@ -19,6 +19,9 @@ To ensure a robust system, testing is conducted across four distinct layers, fol
     * **Adaptive Sampling Rate:** Verifying the switching logic between 10Hz (Cranking) and 0.2Hz (Steady State) modes.
     * **Driver Scoring Calculation:** Validating the $S$ score based on acceleration, braking, and idling pillars.
     * **DTC Translation Mapping:** Ensuring hex codes map to the correct human-readable strings.
+    * **SOC Gate Logic:** Verify that SOH alerts are suppressed if simulated SOC is 65%.
+    * **Debounce Verification:** Verify that a "Critical" notification is ONLY sent on the 3rd consecutive failing start simulation.
+    * **Filter Validation:** Verify that a 15ms voltage drop to 6.0V (Inrush) is correctly ignored by the 100ms moving average.
 
 ### 1.2 Integration Testing
 * **Objective:** Verify that different system components communicate correctly.
@@ -53,6 +56,8 @@ To ensure a robust system, testing is conducted across four distinct layers, fol
 | **FR4** (Sampling) | **TC-5** | **(v1.3 Update)** Transition to Ignition ON (RPM=0). | Polling frequency increases to **10Hz (Target)** proactively. |
 | **FR11** (Protection)| **TC-6** | **(v1.3 Update)** Lower simulated $V_{ocv}$ to **11.4V** (Engine OFF). | Polling stops; "Power Saving Mode" notification sent. |
 | **FR8** (Certificate)| **TC-4** | Request report for the last 30 days. | A signed PDF is generated and downloadable. |
+| **FR5** | **TC-7** | Simulate 3 failing starts ($V_{min}=8.8V$). | Critical alert sent on 3rd attempt. |
+| **FR7** | **TC-8** | Temp = -5°C, SOH = 82%. | Winter Survival Pack alert triggered (85% limit). |
 
 ---
 

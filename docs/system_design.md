@@ -1,10 +1,10 @@
-# System Design Document (SDD): SmartDrive Platform (v1.3)
+# System Design Document (SDD): SmartDrive Platform (v1.4)
 
-**Version:** 1.3
+**Version:** 1.4
 **Date:** Jan 2026
 **Project:** SmartDrive OBD-II Data Platform & Ecosystem
 **Author:** Peter Barna
-**Status:** Updated with v1.3 Winter Protection and Adaptive Sampling Triggers
+**Status:** Updated with v1.4 Winter Protection and Fuel-Type Aware Lookup Table for SOH estimation
 
 ---
 
@@ -45,16 +45,15 @@ The platform follows the Medallion data design pattern with tables for Users, Ve
 ## 3. Algorithms & Business Logic
 The system transforms raw telemetry data (Voltage, RPM, Speed) into actionable intelligence.
 
-### 3.1 Battery Health Prediction (v1.3 Update)
-The algorithm analyzes the **voltage drop** during the engine cranking phase using a **Temperature-Compensated Dynamic Threshold ($V_{crit}$)**.
+### 3.1 Battery Health Prediction (v1.4 Dynamic Matrix)
+The system utilizes a Fuel-Type Aware Lookup Table for SOH estimation.
 
-* **Dynamic Threshold Logic:**
-    * $T \geq 21^\circ C$: **9.6V** (Standard BCI threshold)
-    * $10^\circ C \leq T < 21^\circ C$: **9.4V**
-    * $0^\circ C \leq T < 10^\circ C$: **9.1V**
-    * $T < 0^\circ C$: **8.5V** (Winter Survival Pack threshold)
-* **Logic:** If the minimum voltage ($V_{min}$) falls below $V_{crit}$ for three consecutive days, a "Critical" status is flagged.
-* **Output:** Automated push notification for battery replacement.
+| Ambient Temp ($T_{amb}$) | Min. SOH (Gasoline) | Min. SOH (Diesel) |
+| :--- | :--- | :--- |
+| $> 20^\circ C$ | 60% | 65% |
+| $0^\circ C \dots 20^\circ C$ | 70% | 75% |
+| $-10^\circ C \dots 0^\circ C$ | 75% | 80% |
+| $< -10^\circ C$ | 80% | 85% |
 
 ### 3.2 Mechanic-Translator (Hybrid DTC Interpretation)
 This algorithm interprets Diagnostic Trouble Codes through a tiered lookup strategy:

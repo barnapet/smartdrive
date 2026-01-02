@@ -1,6 +1,6 @@
-# Project Charter (Extended v1.3): SmartDrive OBD-II Data Platform
+# Project Charter (Extended v1.4): SmartDrive OBD-II Data Platform
 
-**Version:** 1.3
+**Version:** 1.4
 **Date:** Jan 2026
 **Project Lead:** Peter Barna
 **Status:** Updated with Winter Edition Safety Logic (11.5V)
@@ -51,6 +51,9 @@ The system utilizes a multi-layered data processing strategy.
 * **Connectivity Performance:** Bluetooth initialization within **5 seconds**.
 * **DevOps KPI:** Infrastructure deployable via Terraform within **15 minutes**.
 * **Reliability:** DTC interpretation accuracy of at least **90%** for P-codes.
+* **Diagnostic Accuracy:** SOH estimation within 95% confidence compared to professional conductance testers.
+* **False Positive Rate:** < 2% via implementation of the 3-cycle debounce rule and 100ms plateau filtering.
+* **Safety Margin:** Maintain a minimum 2.5V buffer between battery "Replace" threshold (8.5V) and ECU brownout floor (6.0V).
 
 ---
 
