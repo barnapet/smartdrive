@@ -38,6 +38,24 @@ resource "aws_s3_bucket_versioning" "bronze_versioning" {
   }
 }
 
+resource "aws_s3_bucket_lifecycle_configuration" "bronze_lifecycle" {
+  bucket = aws_s3_bucket.bronze.id
+
+  rule {
+    id     = "archive-old-telemetry"
+    status = "Enabled"
+
+    transition {
+      days          = 30
+      storage_class = "STANDARD_IA"
+    }
+
+    expiration {
+      days = 90
+    }
+  }
+}
+
 # --- 3. ERROR HANDLING ---
 
 resource "aws_sqs_queue" "alert_dlq" {
