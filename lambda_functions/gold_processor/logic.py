@@ -1,13 +1,14 @@
 import os
 import json
 from datetime import datetime
-from infrastructure.repositories import DynamoDBInsightRepository
 from infrastructure.external_apis import OpenMeteoWeatherProvider
+from infrastructure.repositories import DynamoDBInsightRepository, WeatherCacheRepository
 from domain.services import TemperatureResolver, BatteryHealthService
 
 def handler(event, context):
     repo = DynamoDBInsightRepository(os.environ['INSIGHTS_TABLE'])
-    weather_svc = OpenMeteoWeatherProvider()
+    weather_cache = WeatherCacheRepository(os.environ.get('WEATHER_CACHE_TABLE', 'SmartDriveWeatherCache'))
+    weather_svc = OpenMeteoWeatherProvider(cache_repo=weather_cache)    
     temp_resolver = TemperatureResolver(weather_svc)
     battery_svc = BatteryHealthService()
 
