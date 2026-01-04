@@ -4,26 +4,41 @@ from .interfaces import ITemperatureProvider
 class BatteryHealthService:
     @staticmethod
     def get_adjusted_threshold(base_v: float, temp_c: float) -> float:
-        # Kutatás alapú hőmérséklet-kompenzáció
         return base_v - (0.018 * (25.0 - temp_c))
 
     @staticmethod
+    def get_soh_thresholds(temp_c: float, fuel_type: str) -> tuple:
+        is_diesel = fuel_type.lower() == "diesel"
+        
+        if temp_c > 20.0:
+            return (80.0, 65.0 if is_diesel else 60.0)
+        elif 0.0 <= temp_c <= 20.0:
+            return (80.0, 75.0 if is_diesel else 70.0)
+        elif -10.0 <= temp_c < 0.0:
+            return (85.0 if is_diesel else 80.0, 80.0 if is_diesel else 75.0)
+        else:
+            return (90.0 if is_diesel else 85.0, 85.0 if is_diesel else 80.0)
+
+    @staticmethod
     def evaluate_battery(soh: float, soc: float, vmin: float, temp_c: float) -> dict:
-        # SOC Validációs kapu: 70% alatt nem megbízható a mérés
         if soc < 70.0:
             return {"status": "INCONCLUSIVE", "alerts": ["Alacsony SOC: Töltés szükséges."], "is_valid": False}
 
-        # Küszöbök számítása korrekcióval
         v_pass = BatteryHealthService.get_adjusted_threshold(9.6, temp_c)
         v_fail = BatteryHealthService.get_adjusted_threshold(8.5, temp_c)
 
-        # SOH Monitor szintek
         if vmin < v_fail or soh < 65.0:
             return {"status": "CRITICAL", "alerts": ["Azonnali csere szükséges!"], "is_valid": True}
         elif vmin < v_pass or soh < 80.0:
             return {"status": "WARNING", "alerts": ["Az akkumulátor gyengül."], "is_valid": True}
         
         return {"status": "OK", "alerts": [], "is_valid": True}
+
+    @staticmethod
+    def is_cold_start(temp_c: float, coolant_temp: float = None) -> bool:
+        if coolant_temp is not None:
+            return coolant_temp < 30.0 and abs(coolant_temp - temp_c) < 5.0
+        return temp_c < 10.0
 
 class TemperatureResolver:
     def __init__(self, api_provider: ITemperatureProvider):
