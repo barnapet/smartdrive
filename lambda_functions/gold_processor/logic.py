@@ -34,8 +34,18 @@ def handler(event, context):
                 if h.get('health_status') == "CRITICAL":
                     consecutive_fails += 1
             
+            # --- REFAKTORÁLT RÉSZ KEZDETE ---
             forecast_min = weather_svc.get_forecast_min(data.get('lat'), data.get('lon'))
-            winter_alert = (forecast_min is not None and forecast_min < 0 and (soh < 85 or soc < 60))
+            
+            winter_alert = False
+            if forecast_min is not None and forecast_min < 0:
+                # Lekérjük a dinamikus küszöbértékeket a várható fagyhoz mérten
+                # A tuple első eleme a 'Warning' (sárga), ami a proaktív riasztáshoz kell
+                winter_soh_threshold, _ = battery_svc.get_soh_thresholds(forecast_min, fuel_type)
+                
+                # A riasztás akkor él, ha a jósolt minimum alatti SOH vagy alacsony SOC áll fenn
+                winter_alert = (soh < winter_soh_threshold or soc < 60)
+            # --- REFAKTORÁLT RÉSZ VÉGE ---
 
             repo.save_insight({
                 'vin': vin,
