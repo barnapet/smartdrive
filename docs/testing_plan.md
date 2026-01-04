@@ -1,11 +1,11 @@
-# Testing Plan: SmartDrive Platform (v1.4)
+# Testing Plan: SmartDrive Platform (v1.5)
 
-**Version:** 1.4
+**Version:** 1.5
 **Date:** Jan 2026
 **Project:** SmartDrive OBD-II Data Platform & Ecosystem
 **Focus:** Quality Assurance, Validation, and Verification
 **Author:** Peter Barna
-**Status:** Updated with Winter Logic (11.5V) and Ready-State Triggering
+**Status:** Updated with Requirements Traceability Matrix
 
 ---
 
@@ -58,7 +58,9 @@ To ensure a robust system, testing is conducted across four distinct layers, fol
 | **FR8** (Certificate)| **TC-4** | Request report for the last 30 days. | A signed PDF is generated and downloadable. |
 | **FR5** | **TC-7** | Simulate 3 failing starts ($V_{min}=8.8V$). | Critical alert sent on 3rd attempt. |
 | **FR7** | **TC-8** | Temp = -5°C, SOH = 82%. | Winter Survival Pack alert triggered (85% limit). |
-
+| **FR11** | **TC-9** | Monitor current draw after RPM=0 for 5+ mins. | Current drops below 2mA (Deep Sleep verified). |
+| **FR11** | **TC-10** | Simulate external 2A load during Deep Sleep. | At 11.5V, a "Critical External Drain" notification is received. |
+| **FR11** | **TC-11** | Increase simulated voltage to 13.0V during Sleep. | System exits Deep Sleep and resumes 0.2Hz sampling. |
 ---
 
 ## 3. Testing Environment & Tools

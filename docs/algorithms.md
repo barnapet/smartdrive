@@ -1,11 +1,11 @@
 # System Design: Algorithms & Logic Plan
 
-**Version:** 1.4
+**Version:** 1.5
 **Date:** Jan 2026
 **Project:** SmartDrive OBD-II Data Platform & Ecosystem
 **Document Status:** Detailed Logic Specification
 **Author:** Peter Barna
-**Status:** Updated with v1.4 $V_{min}$ Refinement
+**Status:** Smart Guard Logic (Active Vigilance - v1.5)
 
 ---
 
@@ -31,7 +31,7 @@ Each interpretation is assigned a severity level based on the following categori
 This model analyzes the voltage drop during the engine cranking phase to predict failure before it occurs.
 
 ### 2.1 Mathematical Model & Signal Processing (v1.4 Update)
-To ensure accuracy and avoid false positives from inductive inrush spikes (Phase 1), the system implements a **100ms Moving Average Filter**[cite: 150, 217].
+To ensure accuracy and avoid false positives from inductive inrush spikes (Phase 1), the system implements a **100ms Moving Average Filter**.
 
 **Voltage Plateau Calculation:**
 1. **Inrush Blanking:** Discard the first 100ms of data after starter engagement to ignore the "Hammer Blow" dip.
@@ -71,3 +71,17 @@ An event-driven logic designed to prevent "cold start" failures.
 * **Condition:** AND Battery **SOH < 85%** (higher safety margin for cold viscosity).
 * **Safety Condition:** OR **SOC < 60%** (prevents electrolyte freezing).
 * **Timing:** Alert sent 24 hours prior to forecasted freeze.
+
+---
+
+## 5. Smart Guard Logic (Active Vigilance - v1.5)
+This algorithm transforms the device from a passive observer into an active "sentinel" that distinguishes between system-induced drain and external electrical faults (e.g., lights left on).
+
+### 5.1 Power State Transition
+* **Proactive Sleep:** If Engine State is OFF (RPM = 0) and no active data transmission occurs for > 5 minutes, the hardware enters **Deep Sleep** mode (Power consumption < 2mA).
+* **Pulse Monitoring:** While in Deep Sleep, the device utilizes a watchdog timer to "wake up" for 100ms every 10 minutes to sample the battery voltage ($V_{ocv}$).
+
+### 5.2 External Drain Detection & Alerting
+The system operates on the principle that if $V_{ocv}$ drops significantly while the device is in Deep Sleep, the cause must be an external consumer.
+* **Logic:** If $V_{ocv} \le 11.5V$ is detected during a pulse check while the device was sleeping.
+* **Action:** The device temporarily restores full power to send a high-priority MQTT payload ("Critical External Drain Alert") to the cloud before executing a hardware-level shutdown to preserve the remaining 2.5V buffer (relative to the 9.0V ECU floor).

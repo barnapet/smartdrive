@@ -1,10 +1,10 @@
-# Software Requirements Specification (SRS): SmartDrive Platform (v1.4)
+# Software Requirements Specification (SRS): SmartDrive Platform (v1.5)
 
-**Version:** 1.4
+**Version:** 1.5
 **Date:** Jan 2026
 **Project:** SmartDrive OBD-II Data Platform & Ecosystem
 **Author:** Peter Barna
-**Status:** Updated with Automatic Battery Health Check and Modify Functional Requirements Table
+**Status:** Update FR11 in the Functional Requirements table and add UC-4
 
 ---
 
@@ -46,7 +46,7 @@ The system consists of a cross-platform mobile application, a cloud-native IoT d
 | **FR8** | **Value Guard Certificate** | Generate digitally signed PDF reports of service history and driving profiles. | **Medium** |
 | **FR9** | **Accident Event Recorder** | Highlighted backup of the last 30s of telemetry data upon detecting high G-force events. | **Low** |
 | **FR10** | **User Profile** | Vehicle registration via VIN; support for multi-car management per account. | **High** |
-| **FR11** | **Vampire Drain Protection** | **(v1.3 Update)** Automatically suspend data polling if $V_{ocv} < 11.5V$ while engine is OFF (RPM=0) to prevent battery discharge; resume at $13.0V$. | **High** |
+| **FR11** | **Smart Guard (v1.5)** | **Active Sentinel Mode:** 10-minute cyclic wake-ups during Deep Sleep. Triggers "External Drain Alert" at 11.5V to notify users of potential parasitic loads (e.g., headlights). | **Critical** |
 
 ---
 
@@ -73,6 +73,14 @@ The system consists of a cross-platform mobile application, a cloud-native IoT d
     1. User selects a date range and vehicle.
     2. The system aggregates data from the Gold Layer.
     3. A PDF is generated and made available for download.
+
+### UC-4: External Drain Alert (v1.5 Update)
+* **Actor:** System / User
+* **Process:**
+    1. Vehicle is parked; System enters Deep Sleep after 5 minutes of inactivity.
+    2. System wakes up every 10 minutes; identifies voltage has dropped to 11.5V.
+    3. System concludes that an external source (not the OBD-II dongle) is draining the battery.
+    4. A "Critical External Drain Alert" is pushed to the user's mobile device: *"Smart Guard: Critical voltage drop detected! Please check for lights or electronics left on."*
 
 ---
 

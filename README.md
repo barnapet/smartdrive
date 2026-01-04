@@ -11,14 +11,15 @@
 | Feature | Description | Business Value |
 | :--- | :--- | :--- |
 | **Mechanic-Translator** | Instant interpretation of DTC (Diagnostic Trouble Codes). | Reduces repair costs and information asymmetry. |
-| **Battery Health Prediction** | **(v1.4 Optimized)** Multi-stage analysis with SOC validation, temperature compensation (-18mV/°C), and 3-cycle debounce. | Prevents 98% of cold-start failures through proactive 24h winter alerts. |
+| **Battery Health Prediction** | **(v1.5 Optimized)** Multi-stage analysis with temperature compensation and 10Hz cranking capture. | Prevents 98% of cold-start failures through proactive 24h winter alerts. |
+| **Smart Guard (Active Sentinel)** | **(v1.5 Update)** Pulse monitoring during Deep Sleep. Detects external parasitic drains (e.g., lights left on). | Prevents battery depletion from external factors; alerts user at 11.5V. |
 | **Value Guard Certificate** | Certified, digitally signed PDF reports including validated SOH and driving style history. | Increases resale value by providing scientific battery health proof. |
 | **Driving Style Profiling** | Telemetry-based scoring (braking, acceleration, idling). | Lowers fuel consumption and promotes safety. |
 | **Legal-Light** | Archiving telemetry for critical events (hard braking, collisions). | Objective evidence in legal or insurance disputes. |
 
 ---
 
-## 🏗️ Technological Stack
+## 🏗️  Technological Stack
 
 * **Frontend:** Flutter / React Native (Cross-platform mobile application)
 * **Edge:** ELM327 Bluetooth/BLE OBD-II adapter
@@ -50,14 +51,14 @@ The project includes exhaustive documentation covering every phase of the softwa
 ## 🚀 Roadmap
 
 - [x] Concept definition and technical documentation
-- [ ] Cloud-based Ingestion pipeline setup (Bronze layer)
+- [x] Cloud-based Ingestion pipeline setup (Bronze layer)
 - [ ] Mobile application MVP (DTC reading functionality)
-- [ ] Validation of the Battery Health Prediction algorithm
+- [ ] Validation of the **Smart Guard (v1.5)** pulse monitoring logic
 - [ ] Automated PDF "Value Guard" report generation
 
 ---
 
-## 🛠️ Installation & Development
+## 🛠️  Installation & Development
 
 ### 1. Clone the Repository
 ```bash
@@ -97,14 +98,14 @@ This tool bypasses automatic discovery and forces a stable connection on /dev/rf
 sudo SMARTDRIVE_MODE=REAL ./sd-env/bin/python3 scripts/obd_diagnostic.py
 ```
 
-### Expected Metrics (v1.3 Updated)
+### Expected Metrics (v1.5 Updated)
 
 | Metric | Target Value | Description |
 | :--- | :--- | :--- |
 | **Voltage** | 13.5V – 14.4V | Indicates the alternator is charging the battery. |
-| **$V_{save}$** | 11.5V | (New) Threshold for Vampire Drain Protection. |
-| **Sampling** | 10Hz | (New) Target rate during Ready/Crank phase. |
-| **RPM** | ~800 (idle) | Real-time engine revolutions per minute. |
+| **$V_{save}$** | 11.5V | **Smart Guard** threshold for "Last-Gasp" External Drain Alert. |
+| **Sampling** | 10Hz | Target rate during Ready/Crank phase to capture $V_{min}$. |
+| **Pulse Rate** | 1/10 min | Wake-up frequency during Deep Sleep (Sentinel Mode). |
 
 ---
 

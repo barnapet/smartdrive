@@ -1,9 +1,9 @@
-# Project Charter (Extended v1.4): SmartDrive OBD-II Data Platform
+# Project Charter (Extended v1.5): SmartDrive OBD-II Data Platform
 
-**Version:** 1.4
+**Version:** 1.5
 **Date:** Jan 2026
 **Project Lead:** Peter Barna
-**Status:** Updated with Winter Edition Safety Logic (11.5V)
+**Status:** Updated with Risk Management Matrix
 
 ---
 
@@ -57,7 +57,7 @@ The system utilizes a multi-layered data processing strategy.
 
 ---
 
-## 5. Risk Management Matrix (Updated)
+## 5. Risk Management Matrix (v1.5 Updated)
 
 | Risk Description | Probability | Impact | Mitigation Strategy |
 | :--- | :--- | :--- | :--- |
@@ -66,6 +66,7 @@ The system utilizes a multi-layered data processing strategy.
 | **Incorrect AI Prediction** | Medium | High | Display a **confidence level** alongside insights. |
 | **Vampire Drain** | Medium | High | **(v1.3 Update)** Implement 11.5V cut-off logic with engine-state awareness. |
 | **High-Freq Data Gap** | Low | Medium | **(v1.3 Update)** Initiate 10Hz polling at Ignition ON (RPM=0) to ensure $V_{min}$ capture. |
+| **Total Battery Failure** | Medium | High | **(v1.5 Update)** Implement Smart Guard logic to alert users of external drains (e.g., lights left on) at 11.5V before the car becomes unstartable. |
 
 ---
 
